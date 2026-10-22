@@ -2,35 +2,49 @@
   "id": "stream-countdown",
   "apiVersion": 1,
   "name": "Stream Countdown",
-  "version": "0.1.0",
-  "description": "Build now a separate broadcast-ready on-screen countdown to TODAY 19:15 machine LOCAL time; determine local date/time. If passed show started state, never tomorrow silently. Large legible digits, polished restrained motion, attractive dark broadcast design. At zero: The stream starts now. Editable tentative promo: Buy Wonop at wonop.com — $99, crossed-out $299. This copy is provisional not verified marketing facts, do not block on clarification. Own folder/git, separate from SVG Editor. Implement and test then open on screen ASAP; report actual running state and local time. Iterate later.",
+  "version": "0.2.0",
+  "description": "A broadcast-ready countdown to today's stream start in local time, with an editable promo line.",
   "icon": "icon.svg",
   "entry": "main.ts",
   "ui": "ui/index.html",
-  "window": { "width": 520, "height": 360 },
+  "window": { "width": 960, "height": 540, "title": "Stream Countdown" },
   "strictArgs": true,
   "commands": {
-    "greet": {
-      "help": "say hello to someone",
-      "args": { "who": "string" },
-      "returns": { "said": "string" }
+    "state": {
+      "help": "where the countdown stands: phase, remaining ms, local now and target, settings",
+      "returns": { "phase": "string", "remainingMs": "number", "timeZone": "string", "now": "object", "target": "object", "settings": "object" },
+      "effect": "read"
     },
-    "history": {
-      "help": "everything a window has been told to say",
-      "returns": { "lines": "string[]" }
+    "configure": {
+      "help": "change the target (date YYYY-MM-DD, time HH:MM local) or the copy; every field is optional",
+      "args": {
+        "date": "string?",
+        "time": "string?",
+        "title": "string?",
+        "liveText": "string?",
+        "promoShow": "boolean?",
+        "promoText": "string?",
+        "promoUrl": "string?",
+        "promoPrice": "string?",
+        "promoWas": "string?"
+      },
+      "effect": "write"
+    },
+    "today": {
+      "help": "point the countdown at today's local date, optionally at a new time HH:MM",
+      "args": { "time": "string?" },
+      "effect": "write"
+    },
+    "reset": {
+      "help": "back to today 19:15 local and the default copy",
+      "effect": "write"
     }
-  },
-  "inputs": {
-    "say": { "help": "text to show in the window" }
-  },
-  "outputs": {
-    "said": { "help": "everything this app has been told to say" }
   },
   "palette": [
     {
-      "title": "Greet someone (stream-countdown)",
-      "snippet": "await wm.apps[\"stream-countdown\"].greet({ who: {who} })",
-      "args": [{ "name": "who", "type": "string", "default": "world" }]
+      "title": "Countdown: set start time (stream-countdown)",
+      "snippet": "await wm.apps[\"stream-countdown\"].today({ time: {time} })",
+      "args": [{ "name": "time", "type": "string", "default": "\"19:15\"" }]
     }
   ],
   "permissions": {}

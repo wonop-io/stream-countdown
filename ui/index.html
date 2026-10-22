@@ -1,51 +1,339 @@
 <!doctype html>
 <meta charset="utf-8" />
 <style>
-  /* The workbench injects the base look — type, controls, colours, scrollbars —
-     before this runs, so a package only writes what is specific to itself.
-     Delete this block entirely and the app still looks like it belongs. */
-  main { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-  ul {
-    flex: 1; margin: 0; padding: 8px 12px; list-style: none;
-    overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+  /* A broadcast surface: always dark, whatever the workbench theme, because it
+     is composited into a stream. Colour carries meaning only: red is "live". */
+  :root {
+    --bg: #06070b;
+    --ink: #f4f5f8;
+    --dim: rgba(244, 245, 248, 0.56);
+    --faint: rgba(244, 245, 248, 0.16);
+    --hair: rgba(244, 245, 248, 0.09);
+    --live: #ff3b4e;
+    --font: "SF Pro Display", "Inter", -apple-system, "Helvetica Neue", system-ui, sans-serif;
+    color-scheme: dark;
   }
-  li { padding: 4px 8px; border-radius: 6px; animation: in 160ms ease-out; }
-  li:nth-child(odd) { background: color-mix(in srgb, var(--wm-text) 4%, transparent); }
-  @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-  form {
-    display: flex; gap: 6px; padding: 8px 10px;
-    background: var(--wm-chrome);
-    box-shadow: inset 0 0.5px 0 var(--wm-hairline);
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font-family: var(--font); -webkit-font-smoothing: antialiased; }
+
+  /* Stage: scales with the window so it reads at any capture size. */
+  .stage {
+    position: relative; height: 100vh; width: 100vw;
+    display: grid; grid-template-rows: 1fr auto; place-items: center;
+    padding: 5vh 6vw 4.5vh;
+    container-type: size;
+    isolation: isolate;
   }
-  input { flex: 1; }
+  .stage::before {
+    content: ""; position: absolute; inset: -20%; z-index: -1;
+    background:
+      radial-gradient(40% 50% at 30% 35%, rgba(92, 108, 255, 0.16), transparent 70%),
+      radial-gradient(45% 55% at 72% 65%, rgba(40, 190, 210, 0.10), transparent 70%);
+    filter: blur(20px);
+    animation: drift 28s ease-in-out infinite alternate;
+  }
+  .stage::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.6));
+  }
+  @keyframes drift {
+    from { transform: translate3d(-2%, -1%, 0) scale(1); }
+    to   { transform: translate3d(2%, 1.5%, 0) scale(1.06); }
+  }
+
+  .centre { display: flex; flex-direction: column; align-items: center; gap: 3.2vh; text-align: center; }
+
+  .kicker {
+    display: inline-flex; align-items: center; gap: 0.7em;
+    font-size: clamp(11px, 2.1vh, 22px); font-weight: 600;
+    letter-spacing: 0.32em; text-transform: uppercase; color: var(--dim);
+  }
+  .dot { width: 0.6em; height: 0.6em; border-radius: 50%; background: var(--dim); }
+  .live .dot { background: var(--live); box-shadow: 0 0 0 0 rgba(255, 59, 78, 0.6); animation: pulse 1.8s ease-out infinite; }
+  .live .kicker { color: var(--ink); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 59, 78, 0.55); }
+    100% { box-shadow: 0 0 0 0.9em rgba(255, 59, 78, 0); }
+  }
+
+  .clock { display: flex; align-items: flex-start; gap: 1.2vw; }
+  .unit { display: flex; flex-direction: column; align-items: center; gap: 1.4vh; }
+  .digits {
+    display: flex; font-weight: 600; line-height: 0.92;
+    font-size: min(24vw, 34vh);
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
+  .clock.short .digits { font-size: min(30vw, 40vh); }
+  .d { display: inline-block; width: 0.6em; text-align: center; position: relative; }
+  .d.tick { animation: tick 420ms cubic-bezier(.2, .7, .2, 1); }
+  @keyframes tick {
+    from { opacity: 0.25; transform: translateY(-0.06em); filter: blur(2px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  .sep { font-size: min(24vw, 34vh); line-height: 0.86; font-weight: 300; color: var(--faint); }
+  .clock.short .sep { font-size: min(30vw, 40vh); }
+  .label {
+    font-size: clamp(9px, 1.6vh, 16px); letter-spacing: 0.34em; text-transform: uppercase;
+    color: var(--dim); font-weight: 500;
+  }
+  .when { font-size: clamp(12px, 2.4vh, 26px); color: var(--dim); font-variant-numeric: tabular-nums; }
+  .when b { color: var(--ink); font-weight: 600; }
+
+  .now-msg {
+    font-size: min(9.5vw, 15vh); font-weight: 650; letter-spacing: -0.025em; line-height: 1.02;
+    max-width: 16ch; animation: arrive 900ms cubic-bezier(.2, .7, .2, 1);
+  }
+  @keyframes arrive { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+
+  /* Promo: one quiet line, the price the only loud thing in it. */
+  .promo {
+    display: flex; align-items: center; gap: 1.4vw;
+    padding: 1.6vh 2.4vw; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.045);
+    box-shadow: inset 0 0 0 1px var(--hair);
+    backdrop-filter: blur(8px);
+    font-size: clamp(12px, 2.7vh, 30px);
+    white-space: nowrap;
+  }
+  .promo .url { font-weight: 650; }
+  .promo .sep2 { width: 1px; align-self: stretch; background: var(--faint); }
+  .promo .price { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .promo .was { color: var(--dim); text-decoration: line-through; text-decoration-thickness: 0.08em; font-variant-numeric: tabular-nums; }
+  .promo[hidden] { display: none; }
+
+  [hidden] { display: none !important; }
+
+  /* Editing: off-air controls, revealed on hover or with E. */
+  .edit-btn {
+    position: fixed; top: 10px; right: 10px; z-index: 5;
+    opacity: 0; transition: opacity 200ms;
+    background: rgba(255, 255, 255, 0.08); color: var(--ink);
+    border: 0; border-radius: 8px; padding: 6px 10px; font: 500 12px var(--font); cursor: pointer;
+  }
+  body:hover .edit-btn { opacity: 1; }
+  .panel {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+    background: rgba(3, 4, 7, 0.72); backdrop-filter: blur(6px);
+  }
+  .panel form {
+    width: min(560px, 92vw); max-height: 92vh; overflow: auto;
+    background: #12141b; border-radius: 14px; padding: 18px 20px;
+    box-shadow: 0 0 0 1px var(--hair), 0 24px 60px rgba(0, 0, 0, 0.5);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px;
+    font: 13px var(--font);
+  }
+  .panel h2 { grid-column: 1 / -1; margin: 0; font-size: 15px; font-weight: 650; }
+  .panel .note { grid-column: 1 / -1; margin: -4px 0 4px; color: var(--dim); font-size: 12px; }
+  .panel label { display: grid; gap: 4px; color: var(--dim); font-size: 12px; }
+  .panel label.wide { grid-column: 1 / -1; }
+  .panel label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .panel input[type="text"], .panel input[type="date"], .panel input[type="time"] {
+    background: #0b0c11; color: var(--ink); border: 1px solid var(--hair); border-radius: 7px;
+    padding: 7px 9px; font: 14px var(--font);
+  }
+  .panel .row { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; align-items: center; }
+  .panel .row .err { margin-right: auto; color: var(--live); font-size: 12px; }
+  .panel button { border: 0; border-radius: 8px; padding: 8px 14px; font: 600 13px var(--font); cursor: pointer;
+    background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+  .panel button.primary { background: var(--ink); color: #06070b; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage::before, .d.tick, .live .dot, .now-msg { animation: none; }
+  }
 </style>
-<main>
-  <ul id="lines"></ul>
-  <form id="form">
-    <input id="text" placeholder="say something…" autofocus />
-    <button>Send</button>
-  </form>
+
+<main class="stage" id="stage">
+  <section class="centre" id="counting">
+    <div class="kicker"><span class="dot"></span><span id="title">Live stream starts in</span></div>
+    <div class="clock" id="clock">
+      <div class="unit" id="u-h"><div class="digits" id="hh"></div><div class="label">Hours</div></div>
+      <div class="sep" id="sep-h">:</div>
+      <div class="unit"><div class="digits" id="mm"></div><div class="label">Minutes</div></div>
+      <div class="sep">:</div>
+      <div class="unit"><div class="digits" id="ss"></div><div class="label">Seconds</div></div>
+    </div>
+    <div class="when" id="when"></div>
+  </section>
+
+  <section class="centre" id="started" hidden>
+    <div class="kicker"><span class="dot"></span><span>Live</span></div>
+    <div class="now-msg" id="liveText">The stream starts now</div>
+    <div class="when" id="startedWhen"></div>
+  </section>
+
+  <footer class="promo" id="promo">
+    <span><span id="pText">Buy Wonop at</span> <span class="url" id="pUrl">wonop.com</span></span>
+    <span class="sep2"></span>
+    <span class="price" id="pPrice">$99</span>
+    <span class="was" id="pWas">$299</span>
+  </footer>
 </main>
+
+<button class="edit-btn" id="editBtn" title="Edit (E)">Edit</button>
+
+<div class="panel" id="panel" hidden>
+  <form id="form">
+    <h2>Countdown settings</h2>
+    <p class="note">Times are this machine's local time (<span id="tzName"></span>). Promo copy is provisional.</p>
+    <label>Date<input type="date" name="date" required /></label>
+    <label>Start time<input type="time" name="time" required /></label>
+    <label class="wide">Line above the digits<input type="text" name="title" maxlength="120" /></label>
+    <label class="wide">At zero<input type="text" name="liveText" maxlength="120" /></label>
+    <label class="check wide"><input type="checkbox" name="promoShow" /> Show promo</label>
+    <label>Promo text<input type="text" name="promoText" maxlength="120" /></label>
+    <label>Link<input type="text" name="promoUrl" maxlength="120" /></label>
+    <label>Price<input type="text" name="promoPrice" maxlength="24" /></label>
+    <label>Was (crossed out)<input type="text" name="promoWas" maxlength="24" /></label>
+    <div class="row">
+      <span class="err" id="err"></span>
+      <button type="button" id="todayBtn">Use today</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</div>
+
 <script>
-  // `wm` is injected: call/send/post/onMessage, addressed to this window.
-  const lines = document.getElementById("lines");
-  const add = (text) => {
-    const li = document.createElement("li");
-    li.textContent = text;
-    lines.appendChild(li);
-    lines.scrollTop = lines.scrollHeight;
-  };
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, "0");
+  let settings = null;
+  let tz = "";
+
+  function targetMs(s) {
+    const [y, mo, d] = s.date.split("-").map(Number);
+    const [h, mi] = s.time.split(":").map(Number);
+    return new Date(y, mo - 1, d, h, mi, 0, 0).getTime();
+  }
+
+  function tzAbbr(date) {
+    try {
+      const part = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+        .formatToParts(date).find((p) => p.type === "timeZoneName");
+      return part ? part.value : "";
+    } catch { return ""; }
+  }
+
+  function dayWord(s) {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    if (s.date === today) return "Today";
+    const d = new Date(targetMs(s));
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  // Each digit is its own span so only the ones that change animate.
+  function setDigits(el, text) {
+    if (el.dataset.v === text) return;
+    const prev = el.dataset.v || "";
+    if (el.children.length !== text.length) {
+      el.innerHTML = "";
+      for (const ch of text) { const s = document.createElement("span"); s.className = "d"; el.appendChild(s); }
+    }
+    [...text].forEach((ch, i) => {
+      const s = el.children[i];
+      if (prev[i] !== ch) {
+        s.textContent = ch;
+        s.classList.remove("tick"); void s.offsetWidth; s.classList.add("tick");
+      }
+    });
+    el.dataset.v = text;
+  }
+
+  function render() {
+    if (!settings) return;
+    const target = targetMs(settings);
+    const left = target - Date.now();
+    const started = left <= 0;
+    const abbr = tzAbbr(new Date(target));
+
+    $("counting").hidden = started;
+    $("started").hidden = !started;
+    $("stage").classList.toggle("live", started);
+
+    if (!started) {
+      const total = Math.ceil(left / 1000);
+      const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+      const showH = h > 0;
+      $("u-h").hidden = !showH; $("sep-h").hidden = !showH;
+      $("clock").classList.toggle("short", !showH);
+      if (showH) setDigits($("hh"), pad(h));
+      setDigits($("mm"), pad(m));
+      setDigits($("ss"), pad(sec));
+      $("when").innerHTML = `${dayWord(settings)} at <b>${settings.time}</b> ${abbr}`;
+    } else {
+      const ago = Math.floor(-left / 60000);
+      const day = dayWord(settings);
+      $("startedWhen").textContent =
+        `Started ${day === "Today" ? "today" : day} at ${settings.time} ${abbr}` +
+        (ago >= 1 ? ` · ${ago < 60 ? ago + " min" : Math.floor(ago / 60) + " h " + (ago % 60) + " min"} ago` : "");
+    }
+  }
+
+  function apply(s) {
+    settings = s;
+    $("title").textContent = s.title;
+    $("liveText").textContent = s.liveText;
+    const p = s.promo;
+    $("promo").hidden = !p.show;
+    $("pText").textContent = p.text;
+    $("pUrl").textContent = p.url;
+    $("pPrice").textContent = p.price;
+    $("pWas").textContent = p.was;
+    $("pWas").hidden = !p.was;
+    render();
+  }
+
+  // Tick on the second boundary so digits change in step with the clock.
+  function loop() {
+    render();
+    setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+  }
+  loop();
 
   wm.onMessage((msg) => {
-    if (msg.type === "hello") (msg.lines || []).forEach(add);
-    if (msg.type === "said") add(msg.text);
+    if (msg.type === "settings") { tz = msg.timeZone || ""; apply(msg.settings); }
   });
 
-  document.getElementById("form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const input = document.getElementById("text");
-    if (!input.value) return;
-    wm.send("say", input.value);
-    input.value = "";
+  // ---- editing ----
+  const form = $("form");
+  function openPanel() {
+    if (!settings) return;
+    const p = settings.promo;
+    form.date.value = settings.date; form.time.value = settings.time;
+    form.title.value = settings.title; form.liveText.value = settings.liveText;
+    form.promoShow.checked = p.show; form.promoText.value = p.text; form.promoUrl.value = p.url;
+    form.promoPrice.value = p.price; form.promoWas.value = p.was;
+    $("tzName").textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+    $("err").textContent = "";
+    $("panel").hidden = false;
+    form.time.focus();
+  }
+  const closePanel = () => { $("panel").hidden = true; };
+  $("editBtn").onclick = openPanel;
+  $("cancelBtn").onclick = closePanel;
+  $("todayBtn").onclick = () => {
+    const n = new Date();
+    form.date.value = `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`;
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closePanel();
+    if ((e.key === "e" || e.key === "E") && $("panel").hidden && !e.metaKey && !e.ctrlKey) { e.preventDefault(); openPanel(); }
   });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await wm.call("configure", {
+        date: form.date.value, time: form.time.value.slice(0, 5),
+        title: form.title.value, liveText: form.liveText.value,
+        promoShow: form.promoShow.checked, promoText: form.promoText.value, promoUrl: form.promoUrl.value,
+        promoPrice: form.promoPrice.value, promoWas: form.promoWas.value,
+      });
+      closePanel();
+    } catch (err) {
+      $("err").textContent = (err && err.message) || String(err);
+    }
+  });
+
+  wm.post({ type: "__ui_ready" });
 </script>
