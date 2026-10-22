@@ -52,27 +52,27 @@ function restore() {
   (globalThis as any).Date = RealDate;
 }
 
-Deno.test("first run targets today 19:15 local and stores it", async () => {
+Deno.test("first run targets today 09:15 local and stores it", async () => {
   const clock = freeze(2026, 10, 22, 9, 5);
   try {
     const h = await harness();
     const s = h.spec.commands.state();
     assertEquals(s.target.date, "2026-10-22");
-    assertEquals(s.target.time, "19:15");
+    assertEquals(s.target.time, "09:15");
     assertEquals(s.now.date, "2026-10-22");
     assertEquals(s.now.time, "09:05:00");
     assertEquals(s.phase, "countdown");
-    assertEquals(s.remainingMs, clock.local(2026, 10, 22, 19, 15) - clock.local(2026, 10, 22, 9, 5));
+    assertEquals(s.remainingMs, clock.local(2026, 10, 22, 9, 15) - clock.local(2026, 10, 22, 9, 5));
     assertEquals(h.store.date, "2026-10-22");
   } finally { restore(); }
 });
 
 Deno.test("zero and after is started, never rolled to tomorrow", async () => {
-  const clock = freeze(2026, 10, 22, 19, 14, 59);
+  const clock = freeze(2026, 10, 22, 9, 14, 59);
   try {
     const h = await harness();
     assertEquals(h.spec.commands.state().phase, "countdown");
-    clock.set(clock.local(2026, 10, 22, 19, 15, 0));
+    clock.set(clock.local(2026, 10, 22, 9, 15, 0));
     assertEquals(h.spec.commands.state().remainingMs, 0);
     assertEquals(h.spec.commands.state().phase, "started");
     // Past midnight, still the same target: started, not tomorrow.
@@ -82,8 +82,8 @@ Deno.test("zero and after is started, never rolled to tomorrow", async () => {
   } finally { restore(); }
 });
 
-Deno.test("opening after 19:15 today shows started for today", async () => {
-  freeze(2026, 10, 22, 20, 0);
+Deno.test("opening after 09:15 today shows started for today", async () => {
+  freeze(2026, 10, 22, 9, 30);
   try {
     const h = await harness();
     const s = h.spec.commands.state();
@@ -94,7 +94,7 @@ Deno.test("opening after 19:15 today shows started for today", async () => {
 Deno.test("a stored past date is kept, not moved silently", async () => {
   freeze(2026, 10, 25, 12, 0);
   try {
-    const h = await harness({ date: "2026-10-22", time: "19:15", title: "T", liveText: "L" });
+    const h = await harness({ rev: 2, date: "2026-10-22", time: "19:15", title: "T", liveText: "L" });
     const s = h.spec.commands.state();
     assertEquals([s.phase, s.target.date], ["started", "2026-10-22"]);
     // The promo falls back to defaults when the stored settings lack one.
@@ -124,6 +124,19 @@ Deno.test("configure edits the target and copy, stores them and tells the window
   } finally { restore(); }
 });
 
+Deno.test("settings saved before rev 2 take the corrected 09:15 once", async () => {
+  freeze(2026, 10, 22, 9, 8);
+  try {
+    const h = await harness({ date: "2026-10-22", time: "19:15", title: "T", liveText: "L" });
+    const s = h.spec.commands.state();
+    assertEquals([s.target.date, s.target.time, s.settings.title, h.store.rev], ["2026-10-22", "09:15", "T", 2]);
+    // A time chosen after the correction is kept.
+    h.spec.commands.configure({ time: "19:15" });
+    const again = await harness(h.store);
+    assertEquals(again.spec.commands.state().target.time, "19:15");
+  } finally { restore(); }
+});
+
 Deno.test("default promo copy is the provisional Wonop offer", async () => {
   freeze(2026, 10, 22, 9, 5);
   try {
@@ -141,6 +154,6 @@ Deno.test("bad dates and times are refused", async () => {
     await assertRejects(() => h.spec.commands.configure({ time: "25:00" }), "invalid_args");
     await assertRejects(() => h.spec.commands.configure({ time: "7pm" }), "invalid_args");
     await assertRejects(() => h.spec.commands.configure({ date: "2026-02-30" }), "invalid_args");
-    assertEquals(h.spec.commands.state().target.time, "19:15");
+    assertEquals(h.spec.commands.state().target.time, "09:15");
   } finally { restore(); }
 });

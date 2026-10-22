@@ -14,6 +14,7 @@ interface Promo {
 }
 
 interface Settings {
+  rev: number;
   date: string; // YYYY-MM-DD, local
   time: string; // HH:MM, local, 24h
   title: string; // above the digits while counting down
@@ -21,7 +22,10 @@ interface Settings {
   promo: Promo;
 }
 
-const DEFAULT_TIME = "19:15";
+const DEFAULT_TIME = "09:15";
+// Settings saved before rev 2 carried the mistaken 19:15 default; rev 2 takes
+// the corrected default time once and keeps everything else.
+const REV = 2;
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -45,6 +49,7 @@ function timeZone(): string {
 
 function defaults(now: Date): Settings {
   return {
+    rev: REV,
     date: localDate(now),
     time: DEFAULT_TIME,
     title: "Live stream starts in",
@@ -83,7 +88,13 @@ function load(): Settings {
   const saved = app.store.get();
   if (saved && validDate(saved.date) && validTime(saved.time)) {
     const base = defaults(new Date());
-    return { ...base, ...saved, promo: { ...base.promo, ...(saved.promo ?? {}) } };
+    const merged: Settings = { ...base, ...saved, promo: { ...base.promo, ...(saved.promo ?? {}) } };
+    if (!(saved.rev >= REV)) {
+      merged.rev = REV;
+      merged.time = DEFAULT_TIME;
+      app.store.set(merged);
+    }
+    return merged;
   }
   const fresh = defaults(new Date());
   app.store.set(fresh);

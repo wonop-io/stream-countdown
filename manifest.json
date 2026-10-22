@@ -36,7 +36,7 @@
       "effect": "write"
     },
     "reset": {
-      "help": "back to today 19:15 local and the default copy",
+      "help": "back to today 09:15 local and the default copy",
       "effect": "write"
     }
   },
@@ -44,7 +44,7 @@
     {
       "title": "Countdown: set start time (stream-countdown)",
       "snippet": "await wm.apps[\"stream-countdown\"].today({ time: {time} })",
-      "args": [{ "name": "time", "type": "string", "default": "\"19:15\"" }]
+      "args": [{ "name": "time", "type": "string", "default": "\"09:15\"" }]
     }
   ],
   "permissions": {}
