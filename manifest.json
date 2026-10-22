@@ -1,0 +1,37 @@
+{
+  "id": "stream-countdown",
+  "apiVersion": 1,
+  "name": "Stream Countdown",
+  "version": "0.1.0",
+  "description": "Build now a separate broadcast-ready on-screen countdown to TODAY 19:15 machine LOCAL time; determine local date/time. If passed show started state, never tomorrow silently. Large legible digits, polished restrained motion, attractive dark broadcast design. At zero: The stream starts now. Editable tentative promo: Buy Wonop at wonop.com — $99, crossed-out $299. This copy is provisional not verified marketing facts, do not block on clarification. Own folder/git, separate from SVG Editor. Implement and test then open on screen ASAP; report actual running state and local time. Iterate later.",
+  "icon": "icon.svg",
+  "entry": "main.ts",
+  "ui": "ui/index.html",
+  "window": { "width": 520, "height": 360 },
+  "strictArgs": true,
+  "commands": {
+    "greet": {
+      "help": "say hello to someone",
+      "args": { "who": "string" },
+      "returns": { "said": "string" }
+    },
+    "history": {
+      "help": "everything a window has been told to say",
+      "returns": { "lines": "string[]" }
+    }
+  },
+  "inputs": {
+    "say": { "help": "text to show in the window" }
+  },
+  "outputs": {
+    "said": { "help": "everything this app has been told to say" }
+  },
+  "palette": [
+    {
+      "title": "Greet someone (stream-countdown)",
+      "snippet": "await wm.apps[\"stream-countdown\"].greet({ who: {who} })",
+      "args": [{ "name": "who", "type": "string", "default": "world" }]
+    }
+  ],
+  "permissions": {}
+}
